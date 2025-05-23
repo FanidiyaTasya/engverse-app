@@ -1,41 +1,43 @@
 import routes from '../routes/routes';
 import { getActiveRoute } from '../routes/url-parser';
+import { getAccessToken } from '../models/auth';
+import Header, { setupDropdownToggle } from '../components/header';
 
 class App {
   #content = null;
-  #drawerButton = null;
-  #navigationDrawer = null;
+  #header = null;
 
-  constructor({ navigationDrawer, drawerButton, content }) {
+  constructor({ content, header }) {
     this.#content = content;
-    this.#drawerButton = drawerButton;
-    this.#navigationDrawer = navigationDrawer;
+    this.#header = header;
 
-    this._setupDrawer();
   }
-
-  _setupDrawer() {
-    this.#drawerButton.addEventListener('click', () => {
-      this.#navigationDrawer.classList.toggle('open');
-    });
-
-    document.body.addEventListener('click', (event) => {
-      if (!this.#navigationDrawer.contains(event.target) && !this.#drawerButton.contains(event.target)) {
-        this.#navigationDrawer.classList.remove('open');
-      }
-
-      this.#navigationDrawer.querySelectorAll('a').forEach((link) => {
-        if (link.contains(event.target)) {
-          this.#navigationDrawer.classList.remove('open');
-        }
-      })
-    });
+  shouldShowHeader(url, isLoggedIn) {
+    const noHeaderPages = ['/login', '/register'];
+    if (noHeaderPages.includes(url)) return false;
+    return isLoggedIn;
   }
 
   async renderPage() {
     const url = getActiveRoute();
     const page = routes[url];
     console.log('url:', url, 'page:', page);
+
+    const isLoggedIn = !!getAccessToken();
+    const currentRoute = location.hash;
+
+    if (this.#header) {
+      if (this.shouldShowHeader(url, isLoggedIn)) {
+        this.#header.innerHTML = Header({
+          avatarUrl: 'https://h-o-m-e.org/wp-content/uploads/2022/04/Blank-Profile-Picture-1.jpg',
+          name: 'Tasyyaaa',
+          activeRoute: currentRoute,
+        });
+        setupDropdownToggle();
+      } else {
+        this.#header.innerHTML = '';
+      }
+    }
 
     this.#content.innerHTML = await page.render();
     await page.afterRender();
