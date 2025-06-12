@@ -1,7 +1,7 @@
 export default class QuizPagePresenter {
   #view;
   #model;
-  #quizList = [];
+  #questions = [];
   #currentIndex = 0;
 
   constructor({ view, model }) {
@@ -10,44 +10,47 @@ export default class QuizPagePresenter {
   }
 
   async start() {
-    this.#view.showLoading();
     try {
-      const data = await this.#model.getQuestions();
-      console.log('[DEBUG] Data quiz:', data);
+      this.#view.showLoading();
+      await this.#model.startSession();
 
-      this.#quizList = data.data.questions;
-      this.#view.showQuiz(this.#quizList, this.#currentIndex);
-    } catch (err) {
-      console.error('[ERROR]', err);
-      this.#view.showError('Failed to load questions');
+      const questions = await this.#model.getSessionQuestions();
+      this.#questions = questions;
+
+      const savedIndex = parseInt(localStorage.getItem('reading-currentIndex'), 10);
+      if (!isNaN(savedIndex) && savedIndex >= 0 && savedIndex < this.#questions.length) {
+        this.#currentIndex = savedIndex;
+      } else {
+        this.#currentIndex = 0;
+      }
+
+      this.#view.showQuiz(this.#questions, this.#currentIndex);
+    } catch (error) {
+      this.#view.showError(error.message);
     }
   }
 
-
-  renderCurrentQuiz() {
-    if (this.#quizList.length === 0) return;
-
-    this.#view.showQuiz(this.#quizList, this.#currentIndex);
+  nextQuestion() {
+    if (this.#currentIndex < this.#questions.length - 1) {
+      this.#currentIndex++;
+      localStorage.setItem('reading-currentIndex', this.#currentIndex);
+      this.#view.showQuiz(this.#questions, this.#currentIndex);
+    }
   }
 
   prevQuestion() {
     if (this.#currentIndex > 0) {
       this.#currentIndex--;
-      this.renderCurrentQuiz();
-    }
-  }
-
-  nextQuestion() {
-    if (this.#currentIndex < this.#quizList.length - 1) {
-      this.#currentIndex++;
-      this.renderCurrentQuiz();
+      localStorage.setItem('reading-currentIndex', this.#currentIndex);
+      this.#view.showQuiz(this.#questions, this.#currentIndex);
     }
   }
 
   goToQuestion(index) {
-    if (index >= 0 && index < this.#quizList.length) {
+    if (index >= 0 && index < this.#questions.length) {
       this.#currentIndex = index;
-      this.renderCurrentQuiz();
+      localStorage.setItem('reading-currentIndex', index);
+      this.#view.showQuiz(this.#questions, this.#currentIndex);
     }
   }
 
@@ -56,6 +59,18 @@ export default class QuizPagePresenter {
   }
 
   getQuizCount() {
-    return this.#quizList.length;
+    return this.#questions.length;
+  }
+
+  getSessionId() {
+    return this.#model.getSessionId();
+  }
+
+  getModel() {
+    return this.#model;
+  }
+
+  getQuizList() {
+    return this.#questions;
   }
 }

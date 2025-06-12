@@ -67,7 +67,22 @@ export default class ReadingPage {
   }
 
   async afterRender() {
-    this.#presenter.start();
+    await this.#presenter.start();
+
+    const quizList = this.#presenter.getQuizList();
+    if (!quizList || quizList.length === 0) {
+      console.error("Quiz list kosong.");
+      return;
+    }
+
+    quizList.forEach((quiz, index) => {
+      if (quiz.userAnswer) {
+        this.#answers[index] = quiz.userAnswer;
+        this.#answeredQuestions.add(index);
+      }
+    });
+
+    this.showQuiz(quizList, this.#presenter.getCurrentIndex());
     this.#startTimer();
     this.bindNavigation(
       () => this.#presenter.prevQuestion(),
@@ -129,6 +144,12 @@ export default class ReadingPage {
 
     questionNumber.textContent = `Question ${currentIndex + 1}`;
     questionText.textContent = `${quiz.question}`;
+
+    if (!(currentIndex in this.#answers) && quiz.userAnswer) {
+      this.#answers[currentIndex] = quiz.userAnswer;
+      this.#answeredQuestions.add(currentIndex);
+    }
+
     const optionsArray = Array.isArray(quiz.options)
       ? quiz.options
       : Object.entries(quiz.options).map(([key, value]) => ({
@@ -175,7 +196,7 @@ export default class ReadingPage {
       btn.textContent = i + 1;
       btn.dataset.index = i;
       btn.className = `w-8 h-8 rounded text-sm ${i === currentIndex
-        ? "bg-blue-600 text-white"
+        ? "bg-blue-200 text-white"
         : this.#answeredQuestions.has(i)
           ? "bg-blue-500 text-white"
           : "border border-blue-600 text-blue-600"
@@ -186,16 +207,32 @@ export default class ReadingPage {
   }
 
   bindNavigation(prevHandler, nextHandler) {
-    document.getElementById("prev-btn").addEventListener("click", prevHandler);
+    const prevBtn = document.getElementById("prev-btn");
+    const nextBtn = document.getElementById("next-btn");
 
-    document.getElementById("next-btn").addEventListener("click", () => {
-      const nextBtn = document.getElementById("next-btn");
+    if (!prevBtn || !nextBtn) {
+      console.error("Prev/Next buttons not found in DOM!");
+      return;
+    }
 
+    prevBtn.addEventListener("click", prevHandler);
+    nextBtn.addEventListener("click", async () => {
       if (nextBtn.textContent === "Submit") {
-        alert("Quiz submitted!");
-        window.location.hash = "#/result";
-        clearInterval(this.#timerInterval);
-        console.log("Answers:", this.#answers);
+        try {
+          const sessionId = this.#presenter.getSessionId();
+          const result = await this.#presenter.getModel().submitSession(sessionId);
+
+          console.log("Sesi berhasil disubmit:", result);
+          console.log(result.correctCount);
+
+          localStorage.setItem("reading-result", JSON.stringify(result));
+
+          clearInterval(this.#timerInterval);
+          window.location.hash = "#/result";
+        } catch (error) {
+          console.error("Gagal submit sesi:", error.message);
+          alert("Gagal submit sesi. Silakan coba lagi.");
+        }
         return;
       }
 
@@ -207,15 +244,28 @@ export default class ReadingPage {
     const optionsContainer = document.getElementById("options-container");
 
     optionsContainer.querySelectorAll('input[name="option"]').forEach((radio) => {
-      radio.addEventListener("change", (event) => {
+      radio.addEventListener("change", async (event) => {
         const currentIndex = this.#presenter.getCurrentIndex();
         const selectedValue = event.target.value;
 
         if (quiz.options.hasOwnProperty(selectedValue)) {
           this.#answers[currentIndex] = selectedValue;
           this.#answeredQuestions.add(currentIndex);
-
           document.getElementById("answer-status").textContent = "Answered";
+
+          try {
+            const sessionId = this.#presenter.getModel().getSessionId();
+            const questionId = `${this.section}-${quiz.id}`;
+            const response = await this.#presenter.getModel().submitAnswer({
+              sessionId,
+              questionId,
+              choiceLabel: selectedValue,
+            });
+
+            console.log("Jawaban disubmit:", response);
+          } catch (error) {
+            console.error("Gagal submit jawaban:", error.message);
+          }
 
           const nextBtn = document.getElementById("next-btn");
           if (this.#answeredQuestions.size === this.#presenter.getQuizCount()) {

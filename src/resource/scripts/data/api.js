@@ -7,9 +7,11 @@ const ENDPOINTS = {
   LOGIN: `${BASE_URL}/login`,
   REGISTER: `${BASE_URL}/register`,
   LOGOUT: `${BASE_URL}/logout`,
-  READING: `${BASE_URL}/practice/reading`,
-  STRUCTURE: `${BASE_URL}/practice/structure`,
-  LISTENING: `${BASE_URL}/practice/listening`,
+  START_PRACTICE: (section) => `${BASE_URL}/practice/${section}`,
+  GET_SESSION: (sessionId) => `${BASE_URL}/practice/${sessionId}`,
+  SUBMIT_ANSWER: `${BASE_URL}/answer`,
+  SUBMIT_SESSION: `${BASE_URL}/submit`,
+  GET_SUBMIT: `${BASE_URL}/submit`,
 };
 
 export async function login({ email, password }) {
@@ -59,10 +61,9 @@ export async function logout(token) {
   return await response.json();
 }
 
-export async function getReadingQuestions() {
+export async function startPractice(section) {
   const token = getAccessToken();
-  console.log('[DEBUG] Token:', token);
-  const response = await fetch(ENDPOINTS.READING, {
+  const response = await fetch(ENDPOINTS.START_PRACTICE(section), {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
@@ -71,36 +72,61 @@ export async function getReadingQuestions() {
   });
 
   if (!response.ok) {
-    throw new Error('Gagal mengambil soal reading');
+    throw new Error('Gagal memulai sesi latihan');
   }
 
   return response.json();
 }
 
-export async function getStructureQuestions() {
+export async function getPracticeSession(sessionId) {
   const token = getAccessToken();
-  const response = await fetch(ENDPOINTS.STRUCTURE, {
+  const response = await fetch(ENDPOINTS.GET_SESSION(sessionId), {
+    method: 'GET',
     headers: {
-      'Content-Type': 'application/json',
       Authorization: `Bearer ${token}`,
     },
   });
+
   if (!response.ok) {
-    throw new Error('Gagal mengambil soal structure');
+    throw new Error('Gagal mengambil sesi latihan');
   }
+
   return response.json();
 }
 
-export async function getListeningQuestions() {
+export async function submitPracticeAnswer({ sessionId, questionId, choiceLabel }) {
   const token = getAccessToken();
-  const response = await fetch(ENDPOINTS.LISTENING, {
+  const response = await fetch(ENDPOINTS.SUBMIT_ANSWER, {
+    method: 'POST',
     headers: {
       'Content-Type': 'application/json',
       Authorization: `Bearer ${token}`,
     },
+    body: JSON.stringify({ sessionId, questionId, choiceLabel }),
   });
+
   if (!response.ok) {
-    throw new Error('Gagal mengambil soal listening');
+    throw new Error('Gagal menyimpan jawaban');
   }
+
   return response.json();
+}
+
+export async function submitPracticeSession(sessionId) {
+  const token = getAccessToken();
+  const response = await fetch(ENDPOINTS.SUBMIT_SESSION, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify({ sessionId }),
+  });
+
+  const data = await response.json();
+  if (!response.ok) {
+    throw new Error(data.message || "Gagal submit sesi");
+  }
+
+  return data.data;
 }
